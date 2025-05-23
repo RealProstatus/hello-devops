@@ -1,0 +1,1 @@
+echo "Hello, DevOps!" > "$HOME/hello.txt" && cat "$HOME/hello.txt"
