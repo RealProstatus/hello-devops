@@ -1,0 +1,58 @@
+---
+- name: Automate script execution and log check
+  hosts: localhost
+  tasks:
+    - name: Create temporary directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: docker_files
+      register: temp_dir
+
+    - name: Copy Dockerfile and scripts
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ temp_dir.path }}/"
+      loop:
+        - Dockerfile
+        - http_script.sh
+        - http_script.py
+
+    # Сборка Docker-образа
+    - name: Build Docker image
+      ansible.builtin.command: docker build -t http-script-image {{ temp_dir.path }}
+      register: build_result
+      changed_when: build_result.rc == 0
+
+    # Запуск контейнера
+    - name: Run Docker container
+      ansible.builtin.command: docker run --name http-script-container -d http-script-image
+      register: run_result
+      changed_when: run_result.rc == 0
+
+    # Проверка логов
+    - name: Get container logs
+      ansible.builtin.command: docker logs http-script-container
+      register: logs
+      changed_when: false
+
+    - name: Display logs
+      ansible.builtin.debug:
+        msg: "{{ logs.stdout_lines }}"
+
+    # Проверка успешного выполнения
+    - name: Verify script success
+      ansible.builtin.assert:
+        that:
+          - "'Скрипт выполнен успешно' in logs.stdout"
+        fail_msg: "Скрипт не выполнен успешно."
+        success_msg: "Скрипт выполнен успешно!"
+
+    # Очистка
+    - name: Remove container
+      ansible.builtin.command: docker rm -f http-script-container
+      ignore_errors: yes
+
+    - name: Remove temporary directory
+      ansible.builtin.file:
+        path: "{{ temp_dir.path }}"
+        state: absent

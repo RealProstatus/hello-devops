@@ -1,0 +1,64 @@
+---
+- name: Install Docker and verify setup
+  hosts: localhost
+  become: yes
+  tasks:
+    # Установка зависимостей
+    - name: Install required dependencies
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+        update_cache: yes
+
+    # добавление GPG-ключа Docker
+    - name: Add Docker GPG key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    # Добавление репозитория Docker
+    - name: Add Docker repository
+      ansible.builtin.apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
+        state: present
+
+    # установка Docker
+    - name: Install Docker
+      ansible.builtin.apt:
+        name: docker-ce
+        state: present
+        update_cache: yes
+
+    # запуск и включение службы Docker
+    - name: Start and enable Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    # Добавление текущего пользователя в группу docker
+    - name: Add user to docker group
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    # перезапуск службы Docker для применения изменений
+    - name: Restart Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+
+    # проверка версии Docker
+    - name: Check Docker version
+      ansible.builtin.command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Display Docker version
+      ansible.builtin.debug:
+        msg: "Docker version: {{ docker_version.stdout }}"
